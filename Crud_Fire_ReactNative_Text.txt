@@ -1,0 +1,356 @@
+// Inicio
+instalacion expo => npm install --global expo-cli
+creacion de proyecto => expo init my-project
+instalar reactNavigation => npm install @react-navigation/native
+
+dependencia dicional para trabajar con expo
+expo install react-native-gesture-handler react-native-reanimated react-native-screens react-native-safe-area-context @react-native-community/masked-view
+
+para crear el componente que contiene las diferentes pantallas
+npm i react-navigation-stack
+
+crear la carpeta screen que va a contener todas las pantallas
+
+
+=============================
+/////////Function App
+
+
+import { StatusBar } from "expo-status-bar";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+
+const Stack = createStackNavigator();
+
+import UserList from "./screens/UserList";
+import CreateUserScreen from "./screens/CreateUserScreen";
+import UserDetailsScreen from "./screens/UserDetailsScreen";
+
+function MyStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="UserList"
+        component={UserList}
+        option={{ title: "usert list" }}
+      />
+      <Stack.Screen
+        name="CreateUserScreen"
+        component={CreateUserScreen}
+        option={{ title: "Create a new User" }}
+      />
+      <Stack.Screen
+        name="UserDetailsScreen"
+        component={UserDetailsScreen}
+        option={{ title: "User detail" }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <MyStack />
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+
+==============================================================================================
+//const UserList
+
+
+import React, { useEffect, useState } from "react";
+import { View, Text, ScrollView, Button } from "react-native";
+import firebase from "../database/firebase";
+import { ListItem, Avatar } from "react-native-elements";
+
+const UserList = (props) => {
+  const [users, setUsers] = useState([]);
+
+  useEffect(() => {
+    firebase.db.collection("users").onSnapshot((querySnapshot) => {
+      const users = [];
+      querySnapshot.docs.forEach((doc) => {
+        const { name, email, phone } = doc.data();
+
+        users.push({
+          id: doc.id,
+          name,
+          email,
+          phone,
+        });
+      }),
+        setUsers(users);
+    });
+  }, []);
+
+  return (
+    <ScrollView>
+      <Button
+        title="Create user"
+        onPress={() => props.navigation.navigate("CreateUserScreen")}
+      />
+
+      {users.map((user) => {
+        return (
+          <ListItem
+            key={user.id}
+            bottomDivider
+            onPress={() =>
+              props.navigation.navigate("UserDetailsScreen", {
+                userId: user.id,
+              })
+            }
+          >
+            <Avatar
+              source={{
+                uri:
+                  "https://s3.amazonaws.com/uifaces/faces/twitter/ladylexy/128.jpg",
+              }}
+              rounded
+            />
+
+            <ListItem.Chevron />
+            <ListItem.Content>
+              <ListItem.Title>{user.name}</ListItem.Title>
+
+              <ListItem.Subtitle>{user.email}</ListItem.Subtitle>
+            </ListItem.Content>
+          </ListItem>
+        );
+      })}
+    </ScrollView>
+  );
+};
+
+export default UserList;
+
+========================================================================
+//const updateUser
+
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Button,
+  TextInput,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+
+import firebase from "../database/firebase";
+
+const UserDetailScreen = (props) => {
+  const inicialState = {
+    id: "",
+    name: "",
+    email: "",
+    phone: "",
+  };
+
+  const [user, setUser] = useState(inicialState);
+
+  const [loading, setLoading] = useState(true);
+
+  const getUserById = async (id) => {
+    const dbRef = firebase.db.collection("users").doc(id);
+    const doc = await dbRef.get();
+    const user = doc.data();
+    setUser({
+      ...user,
+      id: doc.id,
+    });
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    getUserById(props.route.params.userId);
+  }, []);
+
+  const handleChangeText = (name, value) => {
+    setUser({ ...user, [name]: value });
+  };
+
+  const deleteUser = async () => {
+    const dbRef = firebase.db
+      .collection("users")
+      .doc(props.route.params.userId);
+
+    await dbRef.delete();
+    props.navigation.navigate("UserList");
+  };
+
+  const updateUser = async () => {
+    const dbRef = firebase.db.collection("users").doc(user.id);
+
+    await dbRef.set({
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    });
+    setUser(inicialState);
+    props.navigation.navigate("UserList");
+  };
+
+  const openConfirmationAlert = () => {
+    Alert.alert("Remove the user", "Are yuo sure?", [
+      { text: "Yes", onPress: () => deleteUser() },
+      { text: "No", onPress: () => dConsole.log("Cancelado") },
+    ]);
+  };
+
+  if (loading) {
+    <View>
+      <ActivityIndicator size="large" color="#9e9e9e" />
+    </View>;
+  }
+
+  return (
+    <ScrollView style={styles.container}>
+      <View style={styles.inputGroup}>
+        <TextInput
+          placeholder="Name User"
+          value={user.name}
+          onChangeText={(value) => handleChangeText("name", value)}
+        />
+      </View>
+      <View style={styles.inputGroup}>
+        <TextInput
+          placeholder="Email User"
+          value={user.email}
+          onChangeText={(value) => handleChangeText("email", value)}
+        />
+      </View>
+      <View style={styles.inputGroup}>
+        <TextInput
+          placeholder="Phone User"
+          value={user.phone}
+          onChangeText={(value) => handleChangeText("phone", value)}
+        />
+      </View>
+      <View>
+        <Button
+          color="#19AC52"
+          title="Update User"
+          onPress={() => updateUser()}
+        />
+      </View>
+      <View>
+        <Button
+          color="#E37399"
+          title="Delete User"
+          onPress={() => openConfirmationAlert()}
+        />
+      </View>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  inputGroup: {
+    flex: 1,
+    padding: 0,
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#cccccc",
+  },
+  container: {
+    flex: 1,
+    padding: 35,
+  },
+});
+
+export default UserDetailScreen;
+
+=================================================
+
+// const CreateUserScreen
+
+import React, {useState} from 'react';
+import {View, Button, TextInput, ScrollView, StyleSheet} from 'react-native';
+import firebase from '../database/firebase';
+
+
+
+const CreateUserScreen = (props) => {
+
+const [state, setState] = useState({
+    name: '',
+    email: '',
+    phone: ''
+})
+
+ 
+const handleChangeText = (name, value) => {
+    setState({...state, [name] :value})
+}
+
+
+
+const saveNewUser = async ()  => {
+    if(state.name ===''){
+        alert('Please provide name')
+    }else{
+        try {
+            await firebase.db.collection('users').add({
+                name: state.name,
+                email: state.email,
+                phone: state.phone
+            })
+            props.navigation.navigate('UserList');            
+        } catch (error) {
+          console.log(error)  
+        }
+    }
+}
+
+
+return (
+<ScrollView style={styles.container} >
+    <View  style={styles.inputGroup}>
+        <TextInput placeholder="Name User"  onChangeText={(value) => handleChangeText('name',value)} />
+    </View>
+    <View style={styles.inputGroup} >
+        <TextInput placeholder="Email User"  onChangeText={(value) => handleChangeText('email',value)} />
+    </View>
+    <View style={styles.inputGroup} >
+        <TextInput placeholder="Phone User" onChangeText={(value) => handleChangeText('phone',value)}  />
+    </View>
+    <View>
+        <Button title="Save User"  onPress={() => saveNewUser()}/>
+    </View>
+</ScrollView>    
+
+)}
+
+const styles = StyleSheet.create({
+    inputGroup: {
+        flex: 1,
+        padding:0,
+        marginBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#cccccc'
+    },
+    container: {
+        flex: 1,
+        padding: 35
+    }
+})
+
+
+
+export default CreateUserScreen;
